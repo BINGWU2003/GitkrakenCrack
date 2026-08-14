@@ -14,11 +14,10 @@ npm install -g yarn
 
 ### 软件安装(11.10.0)
 
-1. 下载最新的安装包
-   官网下载地址：[11.10.0](https://release.gitkraken.dev/gkd/production/normal/windows/x64/11.10.0/3ARoelkZIW4JGU4MYcwhR3ycacr/GitKrakenSetup.exe?utm_source=chatgpt.com)
-2. 安装软件
-3. 安装汉化补丁：[11.10.0 汉化补丁](https://github.com/yk47g/gitkraken-chinese/releases?page=2#release-11.10.0)
-4. 打开软件后，如果你是**初次使用**该软件，会进入用户引导页面。
+1. 下载地址：[11.10.0](https://release.gitkraken.dev/gkd/production/normal/windows/x64/11.10.0/3ARoelkZIW4JGU4MYcwhR3ycacr/GitKrakenSetup.exe?utm_source=chatgpt.com)
+2. 安装汉化补丁：[11.10.0 汉化补丁](https://github.com/yk47g/gitkraken-chinese/releases?page=2#release-11.10.0)
+
+注意：安装成功之后会默认打开GitKraken，如果此时不马上关闭，内部会自动更新到最新版本，导致无法破解。最好断网安装，安装完之后马上关闭，不要打开。
 
 ---
 
