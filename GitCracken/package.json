@@ -12,6 +12,8 @@
   },
   "scripts": {
     "build": "rimraf dist && tsc",
+    "disable-update": "node scripts/gitkraken-update.js disable",
+    "enable-update": "node scripts/gitkraken-update.js enable",
     "gitcracken": "node dist/bin/gitcracken.js",
     "gitcracken:dev": "node $NODE_DEBUG_OPTION -r ts-node/register bin/gitcracken.ts",
     "lint": "tslint -p tsconfig.json"

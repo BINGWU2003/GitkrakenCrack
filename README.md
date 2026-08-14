@@ -6,48 +6,79 @@
 
 ### 准备工作
 
-安装前请确认安装了`node`命令和`yarn`工具
-
-yarn安装教程请参考我的csdn：
-
-[Windows下 安装yarn，利用chocolatey软件包管理工具，比npm更快更稳定--梦逸灵箭的博客](https://blog.csdn.net/weixin_42661321/article/details/87887898)
+```bash
+npm install -g yarn
+```
 
 ---
 
-### 软件安装
+### 软件安装(11.10.0)
 
 1. 下载最新的安装包
-   
-   官网下载地址：`https://release.axocdn.com/win64/GitKrakenSetup.exe
+   官网下载地址：[11.10.0](https://release.gitkraken.dev/gkd/production/normal/windows/x64/11.10.0/3ARoelkZIW4JGU4MYcwhR3ycacr/GitKrakenSetup.exe?utm_source=chatgpt.com)
 2. 安装软件
-3. 打开软件后，如果你是**初次使用**该软件，会进入用户引导页面。
+3. 安装汉化补丁：[11.10.0 汉化补丁](https://github.com/yk47g/gitkraken-chinese/releases?page=2#release-11.10.0)
+4. 打开软件后，如果你是**初次使用**该软件，会进入用户引导页面。
 
-### 软件破解
+---
+
+### 运行脚本
 
 > 此工具 `GNU/Linux` (without `snap`), `Windows`和`macOS` 全平台可用
 
-1. 下载破解脚本，退出软件，执行以下命令
-   **⚠再次提醒：破解之前先关闭 Gitkraken 软件，Mac平台确保在底部Dock栏中也彻底关闭该软件**
+1.下载脚本，退出软件，执行以下命令
+
+**⚠再次提醒：运行脚本之前先关闭 Gitkraken 软件，Mac平台确保在底部Dock栏中也彻底关闭该软件**
 
 ```
+
 git clone https://github.com/mengyilingjian/GitkrakenCrack.git
 
-cd GitkrakenCrack/GitkrakenCrack 
-yarn install 
-yarn build 
+cd GitkrakenCrack/GitkrakenCrack
+yarn install
+yarn build
 yarn gitcracken patcher
 ```
 
-![执行过程.png](https://qiniu.program-er.com/blog/typecho/usr/uploads/gitkraken-pojie.png)
+2.执行过程&结果
 
-2. 重启gitkraken，则可以看到pro图标
+```
+D:\files\hjc-code\GitkrakenCrack\GitCracken>yarn gitcracken patcher
+yarn run v1.22.22
+(node:14704) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+$ node dist/bin/gitcracken.js patcher
 
-![破解结果.png](https://qiniu.program-er.com/blog/typecho/usr/uploads/gitkraken-success.png)
+ ██████╗ ██╗████████╗ ██████╗██████╗  █████╗  ██████╗██╗  ██╗███████╗███╗   ██╗
+██╔════╝ ██║╚══██╔══╝██╔════╝██╔══██╗██╔══██╗██╔════╝██║ ██╔╝██╔════╝████╗  ██║
+██║  ███╗██║   ██║   ██║     ██████╔╝███████║██║     █████╔╝ █████╗  ██╔██╗ ██║
+██║   ██║██║   ██║   ██║     ██╔══██╗██╔══██║██║     ██╔═██╗ ██╔══╝  ██║╚██╗██║
+╚██████╔╝██║   ██║   ╚██████╗██║  ██║██║  ██║╚██████╗██║  ██╗███████╗██║ ╚████║
+ ╚═════╝ ╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝
 
-3. 关闭自动更新，打开host文件，添加以下内容
+• Description: GitKraken utils for non-commercial use
+• Version: 8.4.0
+• Author: PMExtra, KillWolfVlad
+• License: MIT
+• Home Page: https://blog.jubeat.net/
 
-```bash
-# gitKraken 更新屏蔽 127.0.0.1 release.gitkraken.com
+==> 📦 Backup C:\Users\LX\AppData\Local\gitkraken\app-11.10.0\resources\app.asar ➔ C:\Users\LX\AppData\Local\gitkraken\app-11.10.0\resources\app.asar.1786673382064.backup
+==> 🔓 Unpack C:\Users\LX\AppData\Local\gitkraken\app-11.10.0\resources\app.asar ➔ C:\Users\LX\AppData\Local\gitkraken\app-11.10.0\resources\app
+==> 🔨 Patch C:\Users\LX\AppData\Local\gitkraken\app-11.10.0\resources\app with pro features
+==> 🔒 Pack C:\Users\LX\AppData\Local\gitkraken\app-11.10.0\resources\app ➔ C:\Users\LX\AppData\Local\gitkraken\app-11.10.0\resources\app.asar
+==> 🔥 Remove C:\Users\LX\AppData\Local\gitkraken\app-11.10.0\resources\app
+==> 👌 Patching done!
+Done in 151.62s.
+
 ```
 
-![屏蔽更新.png](https://www.program-er.com/usr/uploads/2021/05/1101707972.png)
+3.关闭&打开自动更新
+
+```
+yarn disable-update
+
+yarn enable-update
+
+```
+
+4.重启gitkraken

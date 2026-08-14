@@ -65,8 +65,14 @@ $ gitcracken patcher backup unpack patch
 
 ## Disable Automatic Update
 
-Add this content to your `hosts` file:
+Run the following command with administrator/root privileges:
 
-```text
-0.0.0.0 release.gitkraken.com
+```bash
+yarn disable-update
+```
+
+To restore automatic updates:
+
+```bash
+yarn enable-update
 ```
