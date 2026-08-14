@@ -38,6 +38,7 @@ function parseArgs(argv) {
   let hostsPath;
   let updaterPath;
   let skipFirewall = false;
+  let skipExecutionBlock = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -57,6 +58,8 @@ function parseArgs(argv) {
       }
     } else if (argument === "--skip-firewall") {
       skipFirewall = true;
+    } else if (argument === "--skip-execution-block") {
+      skipExecutionBlock = true;
     } else if (argument === "-h" || argument === "--help") {
       return { help: true };
     } else {
@@ -68,8 +71,78 @@ function parseArgs(argv) {
     action,
     hostsPath: hostsPath || defaultHostsPath(),
     updaterPath,
-    skipFirewall
+    skipFirewall,
+    skipExecutionBlock
   };
+}
+
+function currentUserSid() {
+  const result = spawnSync(
+    "whoami.exe",
+    ["/user", "/fo", "csv", "/nh"],
+    { encoding: "utf8", windowsHide: true }
+  );
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  const match = `${result.stdout || ""}`.match(/S-\d+(?:-\d+)+/i);
+  if (result.status !== 0 || !match) {
+    throw new Error("无法确定当前 Windows 用户 SID。");
+  }
+
+  return match[0];
+}
+
+function runIcacls(args) {
+  const result = spawnSync("icacls.exe", args, {
+    encoding: "utf8",
+    windowsHide: true
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.status !== 0) {
+    const detail = `${result.stderr || result.stdout || ""}`.trim();
+    throw new Error(
+      `配置 GitKraken 更新器执行权限失败${detail ? `：${detail}` : "。"}`
+    );
+  }
+}
+
+function removeUpdaterExecutionBlock(updaterPath) {
+  if (!fs.existsSync(updaterPath)) {
+    return;
+  }
+
+  runIcacls([updaterPath, "/remove:d", `*${currentUserSid()}`]);
+}
+
+function disableUpdaterExecution(updaterPath) {
+  if (!fs.existsSync(updaterPath)) {
+    throw new Error(`找不到 GitKraken 更新器：${updaterPath}`);
+  }
+
+  const trustee = `*${currentUserSid()}`;
+  runIcacls([updaterPath, "/remove:d", trustee]);
+  runIcacls([updaterPath, "/deny", `${trustee}:(X)`]);
+}
+
+function configureUpdaterExecution(action, updaterPath) {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  const resolvedUpdaterPath = updaterPath || defaultUpdaterPath();
+  if (action === "enable") {
+    removeUpdaterExecutionBlock(resolvedUpdaterPath);
+    return;
+  }
+
+  disableUpdaterExecution(resolvedUpdaterPath);
 }
 
 function runNetsh(args, options = {}) {
@@ -207,12 +280,13 @@ function enableUpdate(content) {
 
 function printHelp() {
   console.log(
-    "用法：node scripts/gitkraken-update.js <disable|enable> [--hosts <path>] [--updater <path>] [--skip-firewall]"
+    "用法：node scripts/gitkraken-update.js <disable|enable> [--hosts <path>] [--updater <path>] [--skip-firewall] [--skip-execution-block]"
   );
   console.log("  disable          屏蔽 GitKraken 自动更新（默认）");
   console.log("  enable           移除本脚本添加的屏蔽配置");
   console.log("  --updater        指定 Windows GitKraken Update.exe 路径");
-  console.log("  --skip-firewall  仅修改 hosts，不管理 Windows 防火墙");
+  console.log("  --skip-firewall  不管理 Windows 防火墙");
+  console.log("  --skip-execution-block  不修改 Windows 更新器执行权限");
 }
 
 function main() {
@@ -229,7 +303,22 @@ function main() {
       ? enableUpdate(originalContent)
       : disableUpdate(originalContent);
 
-  let firewallError;
+  const windowsErrors = [];
+  if (!options.skipExecutionBlock) {
+    try {
+      configureUpdaterExecution(options.action, options.updaterPath);
+      if (process.platform === "win32") {
+        console.log(
+          `GitKraken 更新器执行权限阻止已${
+            options.action === "enable" ? "移除" : "启用"
+          }。`
+        );
+      }
+    } catch (error) {
+      windowsErrors.push(error);
+    }
+  }
+
   if (!options.skipFirewall) {
     try {
       configureFirewall(options.action, options.updaterPath);
@@ -241,7 +330,7 @@ function main() {
         );
       }
     } catch (error) {
-      firewallError = error;
+      windowsErrors.push(error);
     }
   }
 
@@ -252,8 +341,12 @@ function main() {
     console.log(`已更新 hosts 文件：${hostsPath}`);
   }
 
-  if (firewallError) {
-    throw firewallError;
+  if (windowsErrors.length > 0) {
+    throw new Error(
+      windowsErrors
+        .map(error => (error && error.message ? error.message : `${error}`))
+        .join(os.EOL)
+    );
   }
 
   console.log(
@@ -286,8 +379,11 @@ if (require.main === module) {
 
 module.exports = {
   configureFirewall,
+  configureUpdaterExecution,
   disableUpdate,
   disableUpdateFirewall,
+  disableUpdaterExecution,
   enableUpdate,
-  removeFirewallRule
+  removeFirewallRule,
+  removeUpdaterExecutionBlock
 };

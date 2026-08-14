@@ -71,10 +71,10 @@ Run the following command with administrator/root privileges:
 yarn disable-update
 ```
 
-On Windows, this command blocks the GitKraken updater with both a hosts entry
-and an outbound firewall rule for `%LOCALAPPDATA%\gitkraken\Update.exe`. The
-firewall rule remains effective when a system proxy such as v2ray or Clash is
-enabled.
+On Windows, this command prevents `%LOCALAPPDATA%\gitkraken\Update.exe` from
+executing, adds an outbound firewall rule for it, and blocks the update host in
+the hosts file. Blocking execution is the primary protection and remains
+effective when a system proxy such as v2ray or Clash is enabled.
 
 To restore automatic updates:
 
@@ -82,4 +82,5 @@ To restore automatic updates:
 yarn enable-update
 ```
 
-Use `--skip-firewall` when only the hosts entry should be changed.
+Use `--skip-firewall` to omit the firewall rule, or
+`--skip-execution-block` to leave the updater executable permission unchanged.
