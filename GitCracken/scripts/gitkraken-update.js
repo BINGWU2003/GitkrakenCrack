@@ -5,10 +5,12 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawnSync } = require("child_process");
 
 const HOST = "release.gitkraken.com";
 const START_MARKER = "# GitCracken: disable GitKraken auto update - start";
 const END_MARKER = "# GitCracken: disable GitKraken auto update - end";
+const FIREWALL_RULE_NAME = "GitCracken - Block GitKraken Auto Update";
 
 function defaultHostsPath() {
   if (process.platform === "win32") {
@@ -22,9 +24,20 @@ function defaultHostsPath() {
   return "/etc/hosts";
 }
 
+function defaultUpdaterPath() {
+  const localAppData = process.env.LOCALAPPDATA;
+  if (!localAppData) {
+    throw new Error("无法确定 GitKraken 更新器路径（LOCALAPPDATA）。");
+  }
+
+  return path.join(localAppData, "gitkraken", "Update.exe");
+}
+
 function parseArgs(argv) {
   let action = "disable";
   let hostsPath;
+  let updaterPath;
+  let skipFirewall = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -36,6 +49,14 @@ function parseArgs(argv) {
       if (!hostsPath) {
         throw new Error("--hosts 后需要指定文件路径。");
       }
+    } else if (argument === "--updater") {
+      updaterPath = argv[index + 1];
+      index += 1;
+      if (!updaterPath) {
+        throw new Error("--updater 后需要指定文件路径。");
+      }
+    } else if (argument === "--skip-firewall") {
+      skipFirewall = true;
     } else if (argument === "-h" || argument === "--help") {
       return { help: true };
     } else {
@@ -43,7 +64,81 @@ function parseArgs(argv) {
     }
   }
 
-  return { action, hostsPath: hostsPath || defaultHostsPath() };
+  return {
+    action,
+    hostsPath: hostsPath || defaultHostsPath(),
+    updaterPath,
+    skipFirewall
+  };
+}
+
+function runNetsh(args, options = {}) {
+  const result = spawnSync("netsh.exe", args, {
+    encoding: "utf8",
+    windowsHide: true
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+
+  if (result.status !== 0) {
+    const detail = `${result.stderr || result.stdout || ""}`.trim();
+    if (
+      options.ignoreRuleNotFound &&
+      (/没有与指定标准相匹配的规则/.test(detail) ||
+        /no rules match the specified criteria/i.test(detail))
+    ) {
+      return;
+    }
+
+    throw new Error(
+      `配置 Windows 防火墙失败${detail ? `：${detail}` : "。"}`
+    );
+  }
+}
+
+function removeFirewallRule() {
+  runNetsh(
+    [
+      "advfirewall",
+      "firewall",
+      "delete",
+      "rule",
+      `name=${FIREWALL_RULE_NAME}`
+    ],
+    { ignoreRuleNotFound: true }
+  );
+}
+
+function disableUpdateFirewall(updaterPath) {
+  // 先删除旧规则，确保更新器路径发生变化后仍能正确刷新规则。
+  removeFirewallRule();
+  runNetsh([
+    "advfirewall",
+    "firewall",
+    "add",
+    "rule",
+    `name=${FIREWALL_RULE_NAME}`,
+    "dir=out",
+    "action=block",
+    `program=${updaterPath}`,
+    "enable=yes",
+    "profile=any"
+  ]);
+}
+
+function configureFirewall(action, updaterPath) {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  if (action === "enable") {
+    removeFirewallRule();
+    return;
+  }
+
+  disableUpdateFirewall(updaterPath || defaultUpdaterPath());
 }
 
 function stripManagedBlock(content) {
@@ -112,10 +207,12 @@ function enableUpdate(content) {
 
 function printHelp() {
   console.log(
-    "用法：node scripts/gitkraken-update.js <disable|enable> [--hosts <path>]"
+    "用法：node scripts/gitkraken-update.js <disable|enable> [--hosts <path>] [--updater <path>] [--skip-firewall]"
   );
-  console.log("  disable  屏蔽 GitKraken 自动更新（默认）");
-  console.log("  enable   移除本脚本添加的屏蔽配置");
+  console.log("  disable          屏蔽 GitKraken 自动更新（默认）");
+  console.log("  enable           移除本脚本添加的屏蔽配置");
+  console.log("  --updater        指定 Windows GitKraken Update.exe 路径");
+  console.log("  --skip-firewall  仅修改 hosts，不管理 Windows 防火墙");
 }
 
 function main() {
@@ -132,20 +229,36 @@ function main() {
       ? enableUpdate(originalContent)
       : disableUpdate(originalContent);
 
-  if (nextContent === originalContent) {
-    console.log(
-      `无需修改：GitKraken 自动更新已${
-        options.action === "enable" ? "恢复" : "关闭"
-      }。`
-    );
-    return;
+  let firewallError;
+  if (!options.skipFirewall) {
+    try {
+      configureFirewall(options.action, options.updaterPath);
+      if (process.platform === "win32") {
+        console.log(
+          `Windows 防火墙更新阻止规则已${
+            options.action === "enable" ? "移除" : "启用"
+          }。`
+        );
+      }
+    } catch (error) {
+      firewallError = error;
+    }
   }
 
-  fs.writeFileSync(hostsPath, nextContent, "utf8");
+  if (nextContent === originalContent) {
+    console.log("hosts 文件无需修改。");
+  } else {
+    fs.writeFileSync(hostsPath, nextContent, "utf8");
+    console.log(`已更新 hosts 文件：${hostsPath}`);
+  }
+
+  if (firewallError) {
+    throw firewallError;
+  }
+
   console.log(
     `GitKraken 自动更新已${options.action === "enable" ? "恢复" : "关闭"}。`
   );
-  console.log(`已更新 hosts 文件：${hostsPath}`);
 }
 
 if (require.main === module) {
@@ -154,8 +267,14 @@ if (require.main === module) {
   } catch (error) {
     if (error && (error.code === "EACCES" || error.code === "EPERM")) {
       console.error(
-        "修改 hosts 文件失败：权限不足，请使用管理员权限重新运行命令。"
+        "操作失败：权限不足，请使用管理员/root 权限重新运行命令。"
       );
+    } else if (
+      process.platform === "win32" &&
+      error &&
+      /需要提升|elevation|access is denied/i.test(error.message || "")
+    ) {
+      console.error("操作失败：请在管理员 PowerShell 或终端中重新运行命令。");
     } else {
       console.error(
         `操作失败：${error && error.message ? error.message : error}`
@@ -165,4 +284,10 @@ if (require.main === module) {
   }
 }
 
-module.exports = { disableUpdate, enableUpdate };
+module.exports = {
+  configureFirewall,
+  disableUpdate,
+  disableUpdateFirewall,
+  enableUpdate,
+  removeFirewallRule
+};

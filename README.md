@@ -80,4 +80,8 @@ yarn enable-update
 
 ```
 
+Windows 下会同时写入 hosts，并为
+`%LOCALAPPDATA%\gitkraken\Update.exe` 添加出站阻止规则，因此使用 v2ray、
+Clash 等系统代理时也能阻止更新。以上命令需要使用管理员权限运行。
+
 4.重启gitkraken
