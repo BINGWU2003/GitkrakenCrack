@@ -81,7 +81,7 @@ yarn enable-update
 ```
 
 Windows 下会禁止 `%LOCALAPPDATA%\gitkraken\Update.exe` 执行，同时写入
-hosts 并添加出站阻止规则。执行权限限制不依赖代理软件，因此切换 v2ray、
-Clash 或代理端口也不会绕过。以上命令需要使用管理员权限运行。
+hosts。执行权限限制不依赖代理软件，因此切换 v2ray、Clash 或代理端口也
+不会绕过。以上命令需要使用管理员权限运行。
 
 4.重启gitkraken

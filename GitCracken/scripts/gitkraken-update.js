@@ -10,7 +10,6 @@ const { spawnSync } = require("child_process");
 const HOST = "release.gitkraken.com";
 const START_MARKER = "# GitCracken: disable GitKraken auto update - start";
 const END_MARKER = "# GitCracken: disable GitKraken auto update - end";
-const FIREWALL_RULE_NAME = "GitCracken - Block GitKraken Auto Update";
 
 function defaultHostsPath() {
   if (process.platform === "win32") {
@@ -37,7 +36,6 @@ function parseArgs(argv) {
   let action = "disable";
   let hostsPath;
   let updaterPath;
-  let skipFirewall = false;
   let skipExecutionBlock = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -56,8 +54,6 @@ function parseArgs(argv) {
       if (!updaterPath) {
         throw new Error("--updater 后需要指定文件路径。");
       }
-    } else if (argument === "--skip-firewall") {
-      skipFirewall = true;
     } else if (argument === "--skip-execution-block") {
       skipExecutionBlock = true;
     } else if (argument === "-h" || argument === "--help") {
@@ -71,7 +67,6 @@ function parseArgs(argv) {
     action,
     hostsPath: hostsPath || defaultHostsPath(),
     updaterPath,
-    skipFirewall,
     skipExecutionBlock
   };
 }
@@ -145,75 +140,6 @@ function configureUpdaterExecution(action, updaterPath) {
   disableUpdaterExecution(resolvedUpdaterPath);
 }
 
-function runNetsh(args, options = {}) {
-  const result = spawnSync("netsh.exe", args, {
-    encoding: "utf8",
-    windowsHide: true
-  });
-
-  if (result.error) {
-    throw result.error;
-  }
-
-  if (result.status !== 0) {
-    const detail = `${result.stderr || result.stdout || ""}`.trim();
-    if (
-      options.ignoreRuleNotFound &&
-      (/没有与指定标准相匹配的规则/.test(detail) ||
-        /no rules match the specified criteria/i.test(detail))
-    ) {
-      return;
-    }
-
-    throw new Error(
-      `配置 Windows 防火墙失败${detail ? `：${detail}` : "。"}`
-    );
-  }
-}
-
-function removeFirewallRule() {
-  runNetsh(
-    [
-      "advfirewall",
-      "firewall",
-      "delete",
-      "rule",
-      `name=${FIREWALL_RULE_NAME}`
-    ],
-    { ignoreRuleNotFound: true }
-  );
-}
-
-function disableUpdateFirewall(updaterPath) {
-  // 先删除旧规则，确保更新器路径发生变化后仍能正确刷新规则。
-  removeFirewallRule();
-  runNetsh([
-    "advfirewall",
-    "firewall",
-    "add",
-    "rule",
-    `name=${FIREWALL_RULE_NAME}`,
-    "dir=out",
-    "action=block",
-    `program=${updaterPath}`,
-    "enable=yes",
-    "profile=any"
-  ]);
-}
-
-function configureFirewall(action, updaterPath) {
-  if (process.platform !== "win32") {
-    return;
-  }
-
-  if (action === "enable") {
-    removeFirewallRule();
-    return;
-  }
-
-  disableUpdateFirewall(updaterPath || defaultUpdaterPath());
-}
-
 function stripManagedBlock(content) {
   const escapedStart = START_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const escapedEnd = END_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -280,12 +206,11 @@ function enableUpdate(content) {
 
 function printHelp() {
   console.log(
-    "用法：node scripts/gitkraken-update.js <disable|enable> [--hosts <path>] [--updater <path>] [--skip-firewall] [--skip-execution-block]"
+    "用法：node scripts/gitkraken-update.js <disable|enable> [--hosts <path>] [--updater <path>] [--skip-execution-block]"
   );
   console.log("  disable          屏蔽 GitKraken 自动更新（默认）");
   console.log("  enable           移除本脚本添加的屏蔽配置");
   console.log("  --updater        指定 Windows GitKraken Update.exe 路径");
-  console.log("  --skip-firewall  不管理 Windows 防火墙");
   console.log("  --skip-execution-block  不修改 Windows 更新器执行权限");
 }
 
@@ -303,7 +228,7 @@ function main() {
       ? enableUpdate(originalContent)
       : disableUpdate(originalContent);
 
-  const windowsErrors = [];
+  let executionBlockError;
   if (!options.skipExecutionBlock) {
     try {
       configureUpdaterExecution(options.action, options.updaterPath);
@@ -315,22 +240,7 @@ function main() {
         );
       }
     } catch (error) {
-      windowsErrors.push(error);
-    }
-  }
-
-  if (!options.skipFirewall) {
-    try {
-      configureFirewall(options.action, options.updaterPath);
-      if (process.platform === "win32") {
-        console.log(
-          `Windows 防火墙更新阻止规则已${
-            options.action === "enable" ? "移除" : "启用"
-          }。`
-        );
-      }
-    } catch (error) {
-      windowsErrors.push(error);
+      executionBlockError = error;
     }
   }
 
@@ -341,12 +251,8 @@ function main() {
     console.log(`已更新 hosts 文件：${hostsPath}`);
   }
 
-  if (windowsErrors.length > 0) {
-    throw new Error(
-      windowsErrors
-        .map(error => (error && error.message ? error.message : `${error}`))
-        .join(os.EOL)
-    );
+  if (executionBlockError) {
+    throw executionBlockError;
   }
 
   console.log(
@@ -378,12 +284,9 @@ if (require.main === module) {
 }
 
 module.exports = {
-  configureFirewall,
   configureUpdaterExecution,
   disableUpdate,
-  disableUpdateFirewall,
   disableUpdaterExecution,
   enableUpdate,
-  removeFirewallRule,
   removeUpdaterExecutionBlock
 };
